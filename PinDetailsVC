@@ -1,0 +1,35 @@
+//
+//  PinDetails.swift
+//  CustomSlideMenu
+//
+//  Created by Nikolay Sozinov on 31.12.15.
+//  Copyright © 2015 Константин. All rights reserved.
+//
+
+import UIKit
+
+protocol PinDetailsVCDelegate {
+    func menuCloseButtonPinDetailsTapped()
+    func swipeDetail()
+}
+
+class PinDetailsVC: UIViewController {
+    
+    var delegate: PinDetailsVCDelegate?
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        // Do any additional setup after loading the view.
+    }
+    
+    
+    
+    @IBAction func menuCloseButtonPinDetailsTapped(sender: AnyObject) {
+        delegate?.menuCloseButtonPinDetailsTapped()
+    }
+    
+    @IBAction func swipeDetail(sender: AnyObject) {
+        delegate?.swipeDetail()
+    }
+}
