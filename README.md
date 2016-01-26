@@ -8,6 +8,7 @@ Result video:
 https://www.dropbox.com/s/gzm3ntoiryeapxz/testMenuFinal.mov?dl=0&preview=testMenuFinal.mov
 
 Реализовано по Тестовому заданию:
+
 1. Открывается приложение и загружается карта.
 2. Слева и справа -меню, между ними - поиск
 3. Левое меню открывается-закрывается поверх карты
