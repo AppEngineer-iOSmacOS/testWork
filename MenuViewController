@@ -1,0 +1,48 @@
+
+
+import UIKit
+
+protocol MenuViewControllerDelegate {
+    func menuCloseButtonTapped()
+}
+
+class MenuViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
+    
+    var delegate: MenuViewControllerDelegate?
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+
+        // Do any additional setup after loading the view.
+    }
+    
+    //MARK: UITableViewDataSource, UITableViewDelegate
+    
+    func numberOfSectionsInTableView(tableView: UITableView) -> Int {
+        return 1
+    }
+    
+    func tableView(tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return 4
+    }
+    
+    func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCellWithIdentifier("Cell", forIndexPath: indexPath) as UITableViewCell
+        
+        if indexPath.row == 0 {
+            cell.textLabel?.text = "Новости"
+        } else if indexPath.row == 1 {
+            cell.textLabel?.text = "Приложения"
+        } else if indexPath.row == 2 {
+            cell.textLabel?.text = "Профиль"
+        }else if indexPath.row == 3 {
+            cell.textLabel?.text = "Задание"
+        }
+        return cell
+    }
+    
+    @IBAction func menuClosedDidTouch(sender: AnyObject) {
+        delegate?.menuCloseButtonTapped()
+    }
+
+}
