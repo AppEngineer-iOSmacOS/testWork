@@ -1,0 +1,500 @@
+
+
+import UIKit
+import MapKit
+import CoreLocation
+
+class ViewController: UIViewController, MenuViewControllerDelegate, MenuRightVCDelegate, PinDetailsVCDelegate, MKMapViewDelegate, CLLocationManagerDelegate, UIPopoverPresentationControllerDelegate  {
+    
+    var geocoder: CLGeocoder!
+    var myPositions = CLLocationCoordinate2D()
+    
+    
+    @IBOutlet weak var mapView: MKMapView!
+    @IBOutlet weak var textField: UITextField!
+    
+    
+
+    
+    
+
+    
+
+
+    //MARK: LOAD VIEW
+    let locationManager = CLLocationManager()
+    
+    var blackMaskView = UIView(frame: CGRectZero)
+    
+    //View Controller
+    let menuViewController = UIStoryboard(name: "Main", bundle: nil).instantiateViewControllerWithIdentifier("MenuViewController") as! MenuViewController
+    let menuRightVC = UIStoryboard(name: "Main", bundle: nil).instantiateViewControllerWithIdentifier("MenuRightVC") as! MenuRightVC
+    let pinDetailsVC = UIStoryboard(name: "Main", bundle: nil).instantiateViewControllerWithIdentifier("PinDetailsVC") as! PinDetailsVC
+    
+
+    
+    //Constraint (Used animate menu in/out)
+    var menuLeftConstraint: NSLayoutConstraint?
+    var menuRightConstraint: NSLayoutConstraint?
+    var pinDetailsConstraint: NSLayoutConstraint?
+    
+    var isShowingMenu = false
+    var isShowingRightMenu = false
+    var isShowingPinDetails = false
+    
+    var swipeDtl = false
+    
+    
+    
+
+    //MARK: viewDidLoad
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // Do any additional setup after loading the view, typically from a nib.
+    
+        let washington = Capital(title: "Auto Pin с меню", coordinate: CLLocationCoordinate2D(latitude: 55.859606, longitude: 37.415295), info: "Автоматический тестовый Pin")
+        mapView.addAnnotations([washington])
+
+        self.locationManager.delegate = self
+        self.locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        self.locationManager.requestWhenInUseAuthorization()
+        self.locationManager.startUpdatingLocation()
+        
+        self.mapView.showsUserLocation = true
+
+ 
+        
+        geocoder = CLGeocoder()
+        textField.addTarget(self, action: "textFieldDidChanged", forControlEvents: UIControlEvents.EditingChanged)
+        
+     
+  
+        
+
+    
+
+        
+    //MARK: Add menu view controller
+        
+        addChildViewController(menuViewController)
+        menuViewController.delegate = self
+        menuViewController.didMoveToParentViewController(self)
+        menuViewController.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(menuViewController.view)
+        
+        addChildViewController(menuRightVC)
+        menuRightVC.delegate = self
+        menuRightVC.didMoveToParentViewController(self)
+        menuRightVC.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(menuRightVC.view)
+        
+        addChildViewController(pinDetailsVC)
+        pinDetailsVC.delegate = self
+        pinDetailsVC.didMoveToParentViewController(self)
+        pinDetailsVC.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(pinDetailsVC.view)
+        
+        
+        let topConstraint = NSLayoutConstraint(item: menuViewController.view, attribute: NSLayoutAttribute.Top, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Top, multiplier: 1, constant: 0)
+        let bottomConstraint = NSLayoutConstraint(item: menuViewController.view, attribute: NSLayoutAttribute.Bottom, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Bottom, multiplier: 1, constant: 0)
+        let widthConstraint = NSLayoutConstraint(item: menuViewController.view, attribute: NSLayoutAttribute.Width, relatedBy: NSLayoutRelation.Equal, toItem: nil, attribute: NSLayoutAttribute.NotAnAttribute, multiplier: 1, constant: 250)
+        
+        
+        let topConstraintR = NSLayoutConstraint(item: menuRightVC.view, attribute: NSLayoutAttribute.Top, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Top, multiplier: 1, constant: 0)
+        let bottomConstraintR = NSLayoutConstraint(item: menuRightVC.view, attribute: NSLayoutAttribute.Bottom, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Bottom, multiplier: 1, constant: 0)
+        let widthConstraintR = NSLayoutConstraint(item: menuRightVC.view, attribute: NSLayoutAttribute.Width, relatedBy: NSLayoutRelation.Equal, toItem: nil, attribute: NSLayoutAttribute.NotAnAttribute, multiplier: 1, constant: 250)
+        
+        let topConstraintDetail = NSLayoutConstraint(item: pinDetailsVC.view, attribute: NSLayoutAttribute.Top, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Top, multiplier: 1, constant: menuViewController.view.bounds.size.height)
+        let bottomConstraintDetail = NSLayoutConstraint(item: pinDetailsVC.view, attribute: NSLayoutAttribute.Bottom, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Bottom, multiplier: 1, constant: 0)
+        let widthConstraintDetail = NSLayoutConstraint(item: pinDetailsVC.view, attribute: NSLayoutAttribute.Width, relatedBy: NSLayoutRelation.Equal, toItem: nil, attribute: NSLayoutAttribute.NotAnAttribute, multiplier: 1, constant: menuViewController.view.bounds.size.width)
+        
+        
+        menuLeftConstraint = NSLayoutConstraint(item: menuViewController.view, attribute: NSLayoutAttribute.Left, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute:
+            NSLayoutAttribute.Left, multiplier: 1, constant: -widthConstraint.constant)
+        
+        menuRightConstraint = NSLayoutConstraint(item: menuRightVC.view, attribute: NSLayoutAttribute.Right, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute:
+            NSLayoutAttribute.Right, multiplier: 1, constant: -widthConstraint.constant)
+        
+        pinDetailsConstraint = NSLayoutConstraint(item: pinDetailsVC.view, attribute: NSLayoutAttribute.Top, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute:
+            NSLayoutAttribute.Top, multiplier: 1, constant: -topConstraintDetail.constant)
+        
+        view.addConstraints([topConstraint, topConstraintR, menuLeftConstraint!, bottomConstraint, widthConstraint, menuRightConstraint!, bottomConstraintR, widthConstraintR, pinDetailsConstraint!, topConstraintDetail, bottomConstraintDetail, widthConstraintDetail])
+        
+        toogleMenu()
+        toogleRightMenu()
+        tooglePinDetails()
+    
+    }
+
+
+
+//MARK: Geocoder
+    func textFieldDidChanged() {
+    
+    geocoder.geocodeAddressString((textField.text!)) {(placemarks, error) -> Void in
+        if error != nil {
+            print("MapKit error \(error?.description)")
+            self.locationManager.startUpdatingLocation()
+        }
+        if placemarks != nil{
+            if let placemark = placemarks?.first{
+                
+                let annotation = MKPointAnnotation()
+                annotation.title = "Вы искали адрес:"
+                annotation.subtitle = self.textField.text!
+                annotation.coordinate = placemark.location!.coordinate
+                
+                self.mapView.showAnnotations([annotation], animated: true)
+                self.mapView.selectAnnotation(annotation, animated: true)
+//                self.mapView.showsUserLocation = true
+                print(" Координаты найденной точки: \(placemark.location?.coordinate.latitude), \(placemark.location?.coordinate.longitude)")
+                
+                self.locationManager.stopUpdatingLocation()
+                
+            }
+        }
+        }
+    }
+    
+//MARK: Slide Menu
+    
+    
+    func toogleRightMenu() {
+    isShowingRightMenu = !isShowingRightMenu
+        
+        if (isShowingRightMenu) {
+            menuRightConstraint?.constant = menuViewController.view.bounds.size.width
+            
+            UIView.animateWithDuration(0.5, delay: 0.0, usingSpringWithDamping: 0.9, initialSpringVelocity: 0.5, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
+                self.view.layoutIfNeeded()
+                }, completion: { (completed) -> Void in
+                    self.menuViewController.view.hidden = true
+            })
+            
+            UIView.animateWithDuration(0.5, delay: 0.0, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
+                self.view.layoutIfNeeded()
+                self.blackMaskView.alpha = 0.0
+                }, completion: { (completed) -> Void in
+                    self.blackMaskView.removeFromSuperview()
+            })
+        
+        }else {
+            
+            blackMaskView = UIView(frame: CGRectZero)
+            blackMaskView.alpha = 0.0
+            blackMaskView.translatesAutoresizingMaskIntoConstraints = false
+            blackMaskView.backgroundColor = UIColor.blackColor()
+            view.insertSubview(blackMaskView, belowSubview: menuViewController.view)
+            
+            let topConstraint1 = NSLayoutConstraint(item: blackMaskView, attribute: NSLayoutAttribute.Top, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Top, multiplier: 1, constant: 0)
+            let bottomConstraint1 = NSLayoutConstraint(item: blackMaskView, attribute: NSLayoutAttribute.Bottom, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Bottom, multiplier: 1, constant: 0)
+            let leftConstraint1 = NSLayoutConstraint(item: blackMaskView, attribute: NSLayoutAttribute.Leading, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Leading, multiplier: 1, constant: 0)
+            let rightConstraint1 = NSLayoutConstraint(item: blackMaskView, attribute: NSLayoutAttribute.Trailing, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Trailing, multiplier: 1, constant: 0)
+            
+            view.addConstraints([topConstraint1, bottomConstraint1, leftConstraint1, rightConstraint1])
+            view.layoutIfNeeded()
+            
+            UIView.animateWithDuration(0.5, delay: 0.0, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
+                self.view.layoutIfNeeded()
+                self.blackMaskView.alpha = 0.5
+                }, completion: { (completed) -> Void in
+                    let tapGesture1 = UITapGestureRecognizer(target: self, action: "tapGesture1Recognized")
+                    self.blackMaskView.addGestureRecognizer(tapGesture1)
+            })
+            
+            menuViewController.view.hidden = false
+            menuRightConstraint?.constant = 0
+            UIView.animateWithDuration(0.5, delay: 0.0, usingSpringWithDamping: 0.9, initialSpringVelocity: 0.5, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
+                self.view.layoutIfNeeded()
+                }, completion: { (completed) -> Void in
+                    
+            })
+        }
+
+        
+    }
+    
+    
+    
+    
+    func toogleMenu() {
+        isShowingMenu = !isShowingMenu
+        
+        if(isShowingMenu) {
+            //Hide Menu
+            
+//            UIApplication.sharedApplication().setStatusBarHidden(false, withAnimation: UIStatusBarAnimation.Slide)
+            
+            menuLeftConstraint?.constant = -menuViewController.view.bounds.size.width
+            
+            UIView.animateWithDuration(0.5, delay: 0.0, usingSpringWithDamping: 0.9, initialSpringVelocity: 0.5, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
+                self.view.layoutIfNeeded()
+                }, completion: { (completed) -> Void in
+                    self.menuViewController.view.hidden = true
+            })
+            
+            UIView.animateWithDuration(0.5, delay: 0.0, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
+                self.view.layoutIfNeeded()
+                self.blackMaskView.alpha = 0.0
+                }, completion: { (completed) -> Void in
+                    self.blackMaskView.removeFromSuperview()
+            })
+            
+        } else {
+            //Present Menu
+            
+//            UIApplication.sharedApplication().setStatusBarHidden(true, withAnimation: UIStatusBarAnimation.Slide)
+            
+            blackMaskView = UIView(frame: CGRectZero)
+            blackMaskView.alpha = 0.0
+            blackMaskView.translatesAutoresizingMaskIntoConstraints = false
+            blackMaskView.backgroundColor = UIColor.blackColor()
+            view.insertSubview(blackMaskView, belowSubview: menuViewController.view)
+            
+            let topConstraint = NSLayoutConstraint(item: blackMaskView, attribute: NSLayoutAttribute.Top, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Top, multiplier: 1, constant: 0)
+            let bottomConstraint = NSLayoutConstraint(item: blackMaskView, attribute: NSLayoutAttribute.Bottom, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Bottom, multiplier: 1, constant: 0)
+            let leftConstraint = NSLayoutConstraint(item: blackMaskView, attribute: NSLayoutAttribute.Leading, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Leading, multiplier: 1, constant: 0)
+            let rightConstraint = NSLayoutConstraint(item: blackMaskView, attribute: NSLayoutAttribute.Trailing, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Trailing, multiplier: 1, constant: 0)
+            
+            view.addConstraints([topConstraint, bottomConstraint, leftConstraint, rightConstraint])
+            view.layoutIfNeeded()
+            
+            UIView.animateWithDuration(0.5, delay: 0.0, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
+                self.view.layoutIfNeeded()
+                self.blackMaskView.alpha = 0.5
+                }, completion: { (completed) -> Void in
+                    let tapGesture = UITapGestureRecognizer(target: self, action: "tapGestureRecognized")
+                    self.blackMaskView.addGestureRecognizer(tapGesture)
+            })
+            
+            menuViewController.view.hidden = false
+            menuLeftConstraint?.constant = 0
+            UIView.animateWithDuration(0.5, delay: 0.0, usingSpringWithDamping: 0.9, initialSpringVelocity: 0.5, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
+                self.view.layoutIfNeeded()
+                }, completion: { (completed) -> Void in
+                    
+            })
+        }
+    }
+    
+    
+    func tooglePinDetails() {
+        isShowingPinDetails = !isShowingPinDetails
+        
+        if (isShowingPinDetails) {
+            pinDetailsConstraint?.constant = menuViewController.view.bounds.size.height
+            
+            UIView.animateWithDuration(0.5, delay: 0.0, usingSpringWithDamping: 0.9, initialSpringVelocity: 0.5, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
+                self.view.layoutIfNeeded()
+                }, completion: { (completed) -> Void in
+                    self.menuViewController.view.hidden = true
+            })
+            
+            UIView.animateWithDuration(0.5, delay: 0.0, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
+                self.view.layoutIfNeeded()
+                self.blackMaskView.alpha = 0.0
+                }, completion: { (completed) -> Void in
+                    self.blackMaskView.removeFromSuperview()
+            })
+            
+        }else {
+            
+            blackMaskView = UIView(frame: CGRectZero)
+            blackMaskView.alpha = 0.0
+            blackMaskView.translatesAutoresizingMaskIntoConstraints = false
+            blackMaskView.backgroundColor = UIColor.blackColor()
+            view.insertSubview(blackMaskView, belowSubview: menuViewController.view)
+            
+            let topConstraintPin = NSLayoutConstraint(item: blackMaskView, attribute: NSLayoutAttribute.Top, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Top, multiplier: 1, constant: 0)
+            let bottomConstraintPin = NSLayoutConstraint(item: blackMaskView, attribute: NSLayoutAttribute.Bottom, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Bottom, multiplier: 1, constant: 0)
+            let leftConstraintPin = NSLayoutConstraint(item: blackMaskView, attribute: NSLayoutAttribute.Leading, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Leading, multiplier: 1, constant: 0)
+            let rightConstraintPin = NSLayoutConstraint(item: blackMaskView, attribute: NSLayoutAttribute.Trailing, relatedBy: NSLayoutRelation.Equal, toItem: view, attribute: NSLayoutAttribute.Trailing, multiplier: 1, constant: 0)
+            
+            view.addConstraints([topConstraintPin, bottomConstraintPin, leftConstraintPin, rightConstraintPin])
+            view.layoutIfNeeded()
+            
+            UIView.animateWithDuration(0.5, delay: 0.0, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
+                self.view.layoutIfNeeded()
+                self.blackMaskView.alpha = 0.5
+                }, completion: { (completed) -> Void in
+                    let tapGesturePin = UITapGestureRecognizer(target: self, action: "tapGesturePinRecognized")
+                    self.blackMaskView.addGestureRecognizer(tapGesturePin)
+            })
+            
+            menuViewController.view.hidden = false
+//            pinDetailsConstraint?.constant = ((menuViewController.view.bounds.size.height) * 0.65)
+            if swipeDtl == true {
+            pinDetailsConstraint?.constant = ((menuViewController.view.bounds.size.height) * 0.05)
+            } else {
+            pinDetailsConstraint?.constant = ((menuViewController.view.bounds.size.height) * 0.65)
+            }
+            UIView.animateWithDuration(0.5, delay: 0.0, usingSpringWithDamping: 0.9, initialSpringVelocity: 0.5, options: UIViewAnimationOptions.CurveEaseInOut, animations: { () -> Void in
+                self.view.layoutIfNeeded()
+                }, completion: { (completed) -> Void in
+                    
+            })
+        }
+        
+        
+    }
+
+
+//MARK: FUNC TAP ME
+    
+    func tapGestureRecognized() {
+        toogleMenu()
+    }
+    func tapGesture1Recognized() {
+        toogleRightMenu()
+    }
+    
+    func tapGesturePinRecognized(){
+        tooglePinDetails()
+    }
+    
+    @IBAction func menuButtonDidTouch(sender: AnyObject) {
+        toogleMenu()
+    }
+    
+    @IBAction func menuButtonRightDidTouch(sender: AnyObject) {
+        toogleRightMenu()
+    }
+    
+
+    func menuCloseButtonTapped() {
+        toogleMenu()
+    }
+    
+    func menuCloseButtonRightTapped() {
+        toogleRightMenu()
+    }
+    
+    @IBAction func infoButton(sender: AnyObject) {
+        print("Откроем нижнее меню с кнопки")
+        tooglePinDetails()
+    }
+    
+    func menuCloseButtonPinDetailsTapped() {
+        print("функция открытия нижнего меню с кнопки")
+        tooglePinDetails()
+    }
+    
+    func swipeDetail() {
+    print("сработала функйия открытия ПОЛНОГО нижнего меню")
+        swipeDtl = true
+          tooglePinDetails()
+          tooglePinDetails()
+        swipeDtl = false
+        
+        
+    }
+    
+   
+
+    
+//MARK: add Pin
+    @IBAction func addPin(sender: UILongPressGestureRecognizer) {
+        
+        
+        let location = sender.locationInView(self.mapView)
+        let locCord =  self.mapView.convertPoint(location, toCoordinateFromView: self.mapView)
+    
+        
+        let annotation = MKPointAnnotation()
+        annotation.coordinate = locCord
+        annotation.title = "Ваша точка"
+        
+        annotation.subtitle = "\(annotation.coordinate.latitude), \(annotation.coordinate.longitude)"
+        
+        let placeName = "Вы установили новую точку в координаты"
+        let placeInfo = annotation.subtitle
+        
+        let ac = UIAlertController(title: placeName, message: placeInfo, preferredStyle: .ActionSheet)
+        ac.addAction(UIAlertAction(title: "OK", style: .Default, handler: nil))
+        presentViewController(ac, animated: true, completion: nil)
+        
+        
+        //        self.mapView.removeAnnotations(mapView.annotations)
+        self.mapView.addAnnotation(annotation)
+        
+        
+    }
+    
+    func showPopover() {
+        print("test popover")
+          tooglePinDetails()
+       
+    }
+    
+//MARK:    Location Delegate metod
+
+
+    
+    
+    func locationManager(manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        let location = locations.last
+        let center = CLLocationCoordinate2D(latitude: location!.coordinate.latitude, longitude: location!.coordinate.longitude)
+        let region = MKCoordinateRegion(center: center, span: MKCoordinateSpan(latitudeDelta: 1, longitudeDelta: 1))
+        
+        self.mapView.setRegion(region, animated: true)
+        
+       self.locationManager.stopUpdatingHeading()
+        
+        print(" Координаты : \(region.center.latitude), \(region.center.longitude)")
+         self.locationManager.stopUpdatingLocation()
+
+        
+    }
+    
+    func locationManager(manager: CLLocationManager, didFailWithError error: NSError) {
+        print("Errors: " + error.localizedDescription)
+    }
+
+    
+    
+    
+    func mapView(mapView: MKMapView, viewForAnnotation annotation: MKAnnotation) -> MKAnnotationView? {
+        // 1
+        let identifier = "Capital"
+        
+        // 2
+        if annotation.isKindOfClass(Capital.self) {
+            // 3
+            var annotationView = mapView.dequeueReusableAnnotationViewWithIdentifier(identifier)
+            
+            if annotationView == nil {
+                //4
+                annotationView = MKPinAnnotationView(annotation:annotation, reuseIdentifier:identifier)
+                annotationView!.canShowCallout = true
+                
+                // 5
+                let btn = UIButton(type: .DetailDisclosure)
+                annotationView!.rightCalloutAccessoryView = btn
+                btn.addTarget(self, action: "showPopover", forControlEvents: UIControlEvents.TouchUpInside)
+            } else {
+                // 6
+                annotationView!.annotation = annotation
+            }
+            
+            return annotationView
+        }
+        
+        // 7
+        return nil
+    }
+    
+//    func mapView(mapView: MKMapView, annotationView view: MKAnnotationView, calloutAccessoryControlTapped control: UIControl) {
+//        let capital = view.annotation as! Capital
+//        let placeName = capital.title
+//        let placeInfo = capital.info
+//        
+//        
+//        let ac = UIAlertController(title: placeName, message: placeInfo, preferredStyle: .Alert)
+//        ac.addAction(UIAlertAction(title: "OK", style: .Default, handler: nil))
+//        presentViewController(ac, animated: true, completion: nil)
+//    }
+
+    
+}
+
